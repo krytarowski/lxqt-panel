@@ -84,7 +84,7 @@ private:
     QScopedPointer<NETRootInfo> mDesktops;
     DesktopSwitchButton::LabelType mLabelType;
 
-    void setup();
+    void refresh();
 
 private slots:
     void setDesktop(int desktop);

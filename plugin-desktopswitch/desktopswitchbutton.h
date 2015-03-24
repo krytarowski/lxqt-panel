@@ -48,6 +48,7 @@ public:
     };
 
     DesktopSwitchButton(QWidget * parent, int index, const QString &path, const QString &shortcut, LabelType labelType, const QString &title=QString());
+    void update(int index, const QString &path, const QString &shortcut, LabelType labelType,  const QString &title);
 
 public slots:
     void unregisterShortcut();

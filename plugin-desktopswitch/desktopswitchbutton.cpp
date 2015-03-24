@@ -37,14 +37,8 @@ DesktopSwitchButton::DesktopSwitchButton(QWidget * parent, int index, const QStr
     , m_shortcut(0)
     , mIndex(index)
 {
-    switch (labelType) {
-        case LABEL_TYPE_NAME:
-            setText(title);
-            break;
+    update(index, path, shortcut, labelType, title);
 
-        default: // LABEL_TYPE_NUMBER
-            setText(QString::number(index + 1));
-    }
     setCheckable(true);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -63,7 +57,21 @@ DesktopSwitchButton::DesktopSwitchButton(QWidget * parent, int index, const QStr
             connect(m_shortcut, SIGNAL(activated()), this, SIGNAL(activated()));
         }
     }
+}
 
+void DesktopSwitchButton::update(int index, const QString &path, const QString &shortcut, LabelType labelType, const QString &title)
+{
+
+    switch (labelType) {
+        case LABEL_TYPE_NAME:
+            setText(title);
+            break;
+
+        default: // LABEL_TYPE_NUMBER
+            setText(QString::number(index + 1));
+    }
+
+    mIndex = index;
     if (!title.isEmpty())
     {
         setToolTip(title);
