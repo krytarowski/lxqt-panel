@@ -46,9 +46,9 @@ DesktopSwitch::DesktopSwitch(const ILxQtPanelPluginStartupInfo &startupInfo) :
     ILxQtPanelPlugin(startupInfo),
     m_pSignalMapper(new QSignalMapper(this)),
     m_desktopCount(KWindowSystem::numberOfDesktops()),
-    mRows(1),
+    mRows(-1),
     mDesktops(new NETRootInfo(QX11Info::connection(), NET::NumberOfDesktops | NET::CurrentDesktop | NET::DesktopNames, NET::WM2DesktopLayout)),
-    mLabelType(DesktopSwitchButton::LABEL_TYPE_NUMBER)
+    mLabelType(static_cast<DesktopSwitchButton::LabelType>(-1))
 {
     m_buttons = new QButtonGroup(this);
     connect (m_pSignalMapper, SIGNAL(mapped(int)), this, SLOT(setDesktop(int)));
@@ -56,24 +56,9 @@ DesktopSwitch::DesktopSwitch(const ILxQtPanelPluginStartupInfo &startupInfo) :
     mLayout = new LxQt::GridLayout(&mWidget);
     mWidget.setLayout(mLayout);
 
-    for (int i = 0; i < m_desktopCount; ++i)
-    {
-        QString path = QString("/panel/%1/desktop_%2").arg(settings()->group()).arg(i + 1);
-        QString shortcut = QString("Control+F%1").arg(i + 1);
-        DesktopSwitchButton * m = new DesktopSwitchButton(&mWidget, i, path, shortcut, mLabelType,
-                                                          KWindowSystem::desktopName(i + 1).isEmpty() ?
-                                                          tr("Desktop %1").arg(i + 1) :
-                                                          KWindowSystem::desktopName(i + 1));
-        mWidget.layout()->addWidget(m);
-        m_buttons->addButton(m, i);
-    }
-
     settingsChanged();
 
-    int activeDesk = KWindowSystem::currentDesktop();
-    QAbstractButton * button = m_buttons->button(activeDesk - 1);
-    if (button)
-        button->setChecked(true);
+    onCurrentDesktopChanged(KWindowSystem::currentDesktop());
 
     connect(m_buttons, SIGNAL(buttonClicked(int)), this, SLOT(setDesktop(int)));
 
@@ -88,7 +73,11 @@ void DesktopSwitch::refresh()
     QString path;
     QString shortcut;
 
-    for (int i = 0; i < m_desktopCount; i++)
+    int i = 0;
+    const int current_cnt = btns.count();
+    const int border = qMin(btns.count(), m_desktopCount);
+    //update existing buttons
+    for ( ; i < border; ++i)
     {
         path = QString("/panel/%1/desktop_%2").arg(settings()->group()).arg(i + 1);
         shortcut = QString("Control+F%1").arg(i + 1);
@@ -97,7 +86,29 @@ void DesktopSwitch::refresh()
                        tr("Desktop %1").arg(i + 1) :
                        KWindowSystem::desktopName(i + 1));
     }
-    realign();
+
+    //create new buttons (if neccessary)
+    QAbstractButton *b;
+    for ( ; i < m_desktopCount; ++i)
+    {
+        QString path = QString("/panel/%1/desktop_%2").arg(settings()->group()).arg(i+1);
+        QString shortcut = QString("Control+F%1").arg(i+1);
+        b = new DesktopSwitchButton(&mWidget, i, path, shortcut, mLabelType,
+                KWindowSystem::desktopName(i+1).isEmpty() ?
+                tr("Desktop %1").arg(i+1) :
+                KWindowSystem::desktopName(i+1));
+        mWidget.layout()->addWidget(b);
+        m_buttons->addButton(b, i);
+    }
+
+    //delete unneeded buttons (if neccessary)
+    for ( ; i < current_cnt; ++i)
+    {
+        b = m_buttons->buttons().last();
+        m_buttons->removeButton(b);
+        mWidget.layout()->removeWidget(b);
+        delete b;
+    }
 }
 
 DesktopSwitch::~DesktopSwitch()
@@ -111,28 +122,7 @@ void DesktopSwitch::setDesktop(int desktop)
 
 void DesktopSwitch::onNumberOfDesktopsChanged(int count)
 {
-    QAbstractButton *b;
     qDebug() << "Desktop count changed from" << m_desktopCount << "to" << count;
-    if (m_desktopCount > count)
-    {
-        for (int i = 0; i < m_desktopCount - count; i++) {
-            b = m_buttons->buttons().last();
-            m_buttons->removeButton(b);
-            mWidget.layout()->removeWidget(b);
-            delete b;
-        }
-    } else if (m_desktopCount < count) {
-        for (int i = m_desktopCount; i < count; i++) {
-            QString path = QString("/panel/%1/desktop_%2").arg(settings()->group()).arg(i+1);
-            QString shortcut = QString("Control+F%1").arg(i+1);
-            b = new DesktopSwitchButton(&mWidget, i, path, shortcut, mLabelType,
-                                        KWindowSystem::desktopName(i+1).isEmpty() ?
-                                        tr("Desktop %1").arg(i+1) :
-                                        KWindowSystem::desktopName(i+1));
-            mWidget.layout()->addWidget(b);
-            m_buttons->addButton(b, i);
-        }
-    }
     m_desktopCount = count;
     refresh();
 }
@@ -151,9 +141,18 @@ void DesktopSwitch::onDesktopNamesChanged()
 
 void DesktopSwitch::settingsChanged()
 {
-    mRows = settings()->value("rows", 1).toInt();
-    mLabelType = static_cast<DesktopSwitchButton::LabelType>(settings()->value("labelType", 0).toInt());
-    refresh();
+    int value = settings()->value("rows", 1).toInt();
+    if (mRows != value)
+    {
+        mRows = value;
+        realign();
+    }
+    value = settings()->value("labelType", DesktopSwitchButton::LABEL_TYPE_NUMBER).toInt();
+    if (mLabelType != static_cast<DesktopSwitchButton::LabelType>(value))
+    {
+        mLabelType = static_cast<DesktopSwitchButton::LabelType>(value);
+        refresh();
+    }
 }
 
 void DesktopSwitch::realign()
